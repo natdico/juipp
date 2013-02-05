@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Juipp.Core</id>
+    <version>1.0.37</version>
+    <title>Juicy Presentation Pattern - Core</title>
+    <authors>Natnael Gebremariam</authors>
+    <owners>Natnael Gebremariam</owners>
+    <licenseUrl>https://github.com/natdico/juipp/blob/juipp/MIT_LICENSE.txt</licenseUrl>
+    <projectUrl>http://www.juipp.org/</projectUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Juicy Presentation Pattern- Core NuGet Package</description>
+    <summary>Prepares project for T4 Template Processing and adds the latest Org.Juipp.Core as reference
+For more information, visit http://www.juipp.org"</summary>
+    <copyright>Copyright (c) 2012 Natnael Gebremariam</copyright>
+    <language>en-US</language>
+  </metadata>
+</package>
