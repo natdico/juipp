@@ -188,7 +188,15 @@ namespace Org.Juipp.Core.Controllers
             behavior.BehaviorContext = this;
 
             this.OnBeforeBehaviorEvent(sender, behaviorEvent);
-            this.OnBehaviorEvent(behavior, behaviorEvent);
+            try
+            {
+                this.OnBehaviorEvent(behavior, behaviorEvent);
+            }
+            catch (Exception ex)
+            {
+                this.OnErrorBehaviorEvent(ex);
+                return false;
+            }
             this.OnAfterBehaviorEvent(sender, behaviorEvent);
 
             string viewName = null;
@@ -351,6 +359,7 @@ namespace Org.Juipp.Core.Controllers
         }
 
         protected virtual void InitBehaviorContext() { }
+        protected virtual void OnErrorBehaviorEvent(Exception ex) {}
         protected virtual void OnBeforeBehaviorEvent<T>(IBehaviorEventSender<T> sender, BehaviorEvent<T> behaviorEvent) where T : IViewModel, new()
         {
         }

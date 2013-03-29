@@ -145,7 +145,16 @@ namespace Org.Juipp.Core.Views
             var success = false;
             foreach (var fireBehaviorEventDelegate in this.FireBehaviorEventDelegates)
             {
-                success = fireBehaviorEventDelegate.Invoke(behaviorEvent);
+                if (fireBehaviorEventDelegate.Invoke(behaviorEvent)) success = true;
+            }
+
+            if(success == false)
+            {
+                var @base = this.Parent as ViewBase;
+                if (@base != null)
+                {
+                    success = @base.SendBehaviorEvent(behaviorEvent);
+                }
             }
 
             return success;
