@@ -27,7 +27,7 @@ using System.Collections.Generic;
 namespace Org.Juipp.Core.ViewModels
 {
     [Serializable]
-    public class CollectionViewModel<T> : IList<T> where T : IViewModel
+    public class CollectionViewModel<T> : ViewModel, IList<T> where T : IViewModel
     {
         readonly IList<T> _list = new List<T>();
 

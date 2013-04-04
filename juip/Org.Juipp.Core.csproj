@@ -82,6 +82,7 @@
     <Compile Include="Events\Handlers\ViewTransitionMethodDelegate.cs" />
     <Compile Include="Events\Handlers\VisibilityChangedHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ViewModels\ViewModel.cs" />
     <Compile Include="Views\ViewBase.cs">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>

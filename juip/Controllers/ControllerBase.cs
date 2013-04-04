@@ -122,6 +122,18 @@ namespace Org.Juipp.Core.Controllers
                 this.ViewHistory = viewHistory;
             }
         }
+        private void BindingViewModel(Control view, IViewModel viewModel)
+        {
+            try
+            {
+
+                BindViewModel(view, viewModel);
+            }
+            catch (Exception ex)
+            {
+                this.OnErrorBindingViewModel(ex);
+            }
+        }
         private static void BindViewModel(Control view, IViewModel viewModel)
         {
             if (viewModel == null) return;
@@ -129,21 +141,23 @@ namespace Org.Juipp.Core.Controllers
             var viewType = view.GetType();
             var modelType = viewModel.GetType();
 
+            BindViewModelByConvention(view, viewModel);
+
             var bind = viewType.GetMethods().FirstOrDefault(
                 m =>
-                    m.Name == "Bind"
-                    && m.GetParameters().FirstOrDefault() != null
-                    && m.GetParameters()[0].ParameterType == modelType);
+                m.Name == "Bind"
+                && m.GetParameters().FirstOrDefault() != null
+                && m.GetParameters()[0].ParameterType == modelType);
 
-            if (bind != null) bind.Invoke(view, new object[] { viewModel });
+            if (bind != null) bind.Invoke(view, new object[] {viewModel});
 
             var model = viewType.GetProperties().FirstOrDefault(
-                m => 
-                    m.Name == modelType.Name
-                    && m.GetAccessors().FirstOrDefault() != null
-                    && m.GetSetMethod().GetParameters()[0].ParameterType == modelType);
+                m =>
+                m.Name == modelType.Name
+                && m.GetAccessors().FirstOrDefault() != null
+                && m.GetSetMethod().GetParameters()[0].ParameterType == modelType);
 
-            if (model != null) model.GetSetMethod().Invoke(view, new object[] { viewModel });
+            if (model != null) model.GetSetMethod().Invoke(view, new object[] {viewModel});
 
 
             foreach (var control in view.Controls.OfType<ViewBase>())
@@ -151,6 +165,118 @@ namespace Org.Juipp.Core.Controllers
                 BindViewModel(control as ViewBase, viewModel);
             }
         }
+        private static void BindViewModelByConvention(Control view, IViewModel viewModel)
+        {
+            var viewType = view.GetType();
+            var modelType = viewModel.GetType();
+
+            if(modelType.BaseType != null && modelType.BaseType.IsGenericType)
+            {
+                BindViewModelCollection(view, viewModel);
+                return;
+            }
+
+            foreach (var property in modelType.GetProperties())
+            {
+                if (property.PropertyType == typeof(bool))
+                {
+                    if(BindViewModelVisibility(view, viewModel, property)) continue;
+                }
+                var controlID = string.Format("_{0}_{1}", modelType.Name, property.Name);
+
+                foreach (var field in GetFields(viewType, controlID))
+                {
+                    var control = GetControl(view, viewType, field);
+
+                    var text = GetProperty(field, "Text");
+                    if (text != null)
+                    {
+                        var v = property.GetValue(viewModel, null) ?? string.Empty;
+                        text.GetSetMethod().Invoke(control, new object[] { v });
+                        continue;
+                    }
+
+                    var value = GetProperty(field, "Value");
+                    if (value != null)
+                    {
+                        var v = property.GetValue(viewModel, null) ?? string.Empty;
+                        value.GetSetMethod().Invoke(control, new object[] { v });
+                        continue;
+                    }
+                }
+            }
+        }
+        private static bool BindViewModelVisibility(Control view, IViewModel viewModel, PropertyInfo property)
+        {
+            var viewType = view.GetType();
+            var modelType = viewModel.GetType();
+
+            var controlID = string.Format("_{0}_Visible_{1}", modelType.Name, property.Name);
+
+            foreach (var field in GetFields(viewType, controlID))
+            {
+                var control = GetControl(view, viewType, field);
+
+                var visible = GetProperty(field, "Visible");
+
+                if (visible == null) continue;
+
+                var v = property.GetValue(viewModel, null);
+                visible.GetSetMethod().Invoke(control, new object[] {v});
+
+                return true;
+            }
+            return false;
+        }
+        private static void BindViewModelCollection(Control view, IViewModel viewModel)
+        {
+            var viewType = view.GetType();
+            var modelType = viewModel.GetType();
+
+            var controlID = string.Format("_{0}", modelType.Name);
+
+            foreach (var field in GetFields(viewType, controlID))
+            {
+                var control = GetControl(view, viewType, field);
+
+                var dataSouce = GetProperty(field, "DataSource");
+                if (dataSouce == null) continue;
+
+                var v = viewModel;
+
+                dataSouce.GetSetMethod().Invoke(control, new object[] {v});
+
+                var dataBind = field.FieldType.GetMethods().FirstOrDefault(
+                    m =>
+                    m.Name == "DataBind"
+                    && m.GetParameters().Length == 0);
+
+                if (dataBind != null) dataBind.Invoke(control, new object[] {});
+            }
+        }
+
+        private static PropertyInfo GetProperty(FieldInfo field, string name)
+        {
+            return field.FieldType.GetProperties().FirstOrDefault(m => m.Name == name);
+        }
+
+        private static object GetControl(Control view, Type viewType, FieldInfo field)
+        {
+            return viewType.InvokeMember(
+                field.Name,
+                BindingFlags.GetField | BindingFlags.NonPublic | BindingFlags.Instance,
+                Type.DefaultBinder,
+                view,
+                new object[] {});
+        }
+
+        private static IEnumerable<FieldInfo> GetFields(Type viewType, string controlID)
+        {
+            return viewType
+                .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(m => m.Name.EndsWith(controlID));
+        }
+
         private void FireTransitionEvent<T>(BehaviorEvent<T> args, TransitionEventDelegate<T> transitionEventDelegate, string viewName)  where T : IViewModel, new()
         {
             var transitionEvent = new TransitionEvent<T>(args)
@@ -214,14 +340,14 @@ namespace Org.Juipp.Core.Controllers
 
             if (viewName == null && sender is ViewBase)
             {
-                BindViewModel(sender as ViewBase, behaviorEvent.ViewModel);
+                this.BindingViewModel(sender as ViewBase, behaviorEvent.ViewModel);
             }
             else if (viewName != null)
             {
                 var next = this.GetNextView(viewName);
                 if (next != null)
                 {
-                    BindViewModel(next, behaviorEvent.ViewModel);
+                    this.BindingViewModel(next, behaviorEvent.ViewModel);
 
                     next.OnAfterTransition(behaviorEvent);
                     foreach (var sub in next.Controls.OfType<ViewBase>())
@@ -359,6 +485,7 @@ namespace Org.Juipp.Core.Controllers
         }
 
         protected virtual void InitBehaviorContext() { }
+        protected virtual void OnErrorBindingViewModel(Exception ex) {}
         protected virtual void OnErrorBehaviorEvent(Exception ex) {}
         protected virtual void OnBeforeBehaviorEvent<T>(IBehaviorEventSender<T> sender, BehaviorEvent<T> behaviorEvent) where T : IViewModel, new()
         {
