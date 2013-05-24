@@ -69,7 +69,6 @@ namespace Org.Juipp.Core.Controllers
 
         protected override void OnInit(EventArgs e)
         {
-          
             base.OnInit(e);
             this.OnBehaviorBinding();
         }
@@ -107,7 +106,7 @@ namespace Org.Juipp.Core.Controllers
 
             foreach(var key in Views.Keys)
             {
-                var matchingController = string.Format("{0}Controller", key.Substring(0, key.IndexOf("View", System.StringComparison.Ordinal)));
+                var matchingController = string.Format("{0}Controller", key.Substring(0, key.IndexOf("View", StringComparison.Ordinal)));
 
                 this.ViewControllerBinding.Add(key, this.Controllers.ContainsKey(matchingController) ? matchingController : "Controller");
             }

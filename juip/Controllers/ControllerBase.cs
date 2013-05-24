@@ -24,8 +24,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using Org.Juipp.Core.Behaviors;
@@ -122,26 +125,32 @@ namespace Org.Juipp.Core.Controllers
                 this.ViewHistory = viewHistory;
             }
         }
-        private void BindingViewModel(Control view, IViewModel viewModel)
+        private void BindingViewModel(ViewBase view, IViewModel viewModel)
         {
             try
             {
-
-                BindViewModel(view, viewModel);
+                if(viewModel != null) BindViewModel(view, viewModel);
             }
             catch (Exception ex)
             {
                 this.OnErrorBindingViewModel(ex);
             }
         }
-        private static void BindViewModel(Control view, IViewModel viewModel)
+        private static void BindViewModel(ViewBase view, IViewModel viewModel)
         {
             if (viewModel == null) return;
 
             var viewType = view.GetType();
             var modelType = viewModel.GetType();
 
-            BindViewModelByConvention(view, viewModel);
+            try
+            {
+                BindViewModelByConvention(view, viewModel);
+            }
+            catch(Exception ex)
+            {
+                var e = ex.Message;
+            }
 
             var bind = viewType.GetMethods().FirstOrDefault(
                 m =>
@@ -162,10 +171,10 @@ namespace Org.Juipp.Core.Controllers
 
             foreach (var control in view.Controls.OfType<ViewBase>())
             {
-                BindViewModel(control as ViewBase, viewModel);
+                BindViewModel(control, viewModel);
             }
         }
-        private static void BindViewModelByConvention(Control view, IViewModel viewModel)
+        private static void BindViewModelByConvention(ViewBase view, IViewModel viewModel)
         {
             var viewType = view.GetType();
             var modelType = viewModel.GetType();
@@ -192,7 +201,8 @@ namespace Org.Juipp.Core.Controllers
                     if (text != null)
                     {
                         var v = property.GetValue(viewModel, null) ?? string.Empty;
-                        text.GetSetMethod().Invoke(control, new object[] { v });
+
+                        text.GetSetMethod().Invoke(control, new[] { v.ToString() });
                         continue;
                     }
 
@@ -200,13 +210,13 @@ namespace Org.Juipp.Core.Controllers
                     if (value != null)
                     {
                         var v = property.GetValue(viewModel, null) ?? string.Empty;
-                        value.GetSetMethod().Invoke(control, new object[] { v });
+                        value.GetSetMethod().Invoke(control, new[] { v.ToString() });
                         continue;
                     }
                 }
             }
         }
-        private static bool BindViewModelVisibility(Control view, IViewModel viewModel, PropertyInfo property)
+        private static bool BindViewModelVisibility(ViewBase view, IViewModel viewModel, PropertyInfo property)
         {
             var viewType = view.GetType();
             var modelType = viewModel.GetType();
@@ -222,13 +232,13 @@ namespace Org.Juipp.Core.Controllers
                 if (visible == null) continue;
 
                 var v = property.GetValue(viewModel, null);
-                visible.GetSetMethod().Invoke(control, new object[] {v});
+                visible.GetSetMethod().Invoke(control, new[] {v});
 
                 return true;
             }
             return false;
         }
-        private static void BindViewModelCollection(Control view, IViewModel viewModel)
+        private static void BindViewModelCollection(ViewBase view, IViewModel viewModel)
         {
             var viewType = view.GetType();
             var modelType = viewModel.GetType();
@@ -246,6 +256,9 @@ namespace Org.Juipp.Core.Controllers
 
                 dataSouce.GetSetMethod().Invoke(control, new object[] {v});
 
+                var selectedValue = GetProperty(field, "SelectedValue");
+                selectedValue.GetSetMethod().Invoke(control, new object[] { string.Empty });
+
                 var dataBind = field.FieldType.GetMethods().FirstOrDefault(
                     m =>
                     m.Name == "DataBind"
@@ -260,7 +273,7 @@ namespace Org.Juipp.Core.Controllers
             return field.FieldType.GetProperties().FirstOrDefault(m => m.Name == name);
         }
 
-        private static object GetControl(Control view, Type viewType, FieldInfo field)
+        private static object GetControl(ViewBase view, Type viewType, FieldInfo field)
         {
             return viewType.InvokeMember(
                 field.Name,
@@ -296,7 +309,7 @@ namespace Org.Juipp.Core.Controllers
                 && this.ScriptManager.EnableHistory
                 && string.IsNullOrEmpty(viewName) == false)
             {
-                this.ScriptManager.AddHistoryPoint(new NameValueCollection()
+                this.ScriptManager.AddHistoryPoint(new NameValueCollection
                                                        {
                                                            {"pv", transitionEvent.PreviousViewReference}
                                                        }, transitionEvent.PreviousViewReference);
@@ -366,23 +379,23 @@ namespace Org.Juipp.Core.Controllers
         protected T RetrieveBindingElement<T>()
         {
             var name = typeof(T).FullName;
-            if (name != null)
-            {
+            //if (name != null)
+            //{
                 var bindingItem = this.ViewState[name];
                 if (bindingItem == null) return default(T);
                 return (T)bindingItem;
-            }
-            return default(T);
+            //}
+            //return default(T);
         }
         protected void PersistBindingElement<T>(T element)
         {
             var name = typeof(T).FullName;
-            if (name != null)
-            {
+            //if (name != null)
+            //{
                 var bindingItem = this.ViewState[name];
                 if (bindingItem != null) this.ViewState.Remove(name);
                 this.ViewState.Add(name, element);
-            }
+            //}
         }
         protected object RetrieveBindingElement(string key)
         {
@@ -405,6 +418,163 @@ namespace Org.Juipp.Core.Controllers
 
             }
         }
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            if (string.IsNullOrEmpty(this.Page.ClientQueryString)) return;
+
+            this.ProcessJapi();
+        }
+
+        private void ProcessJapi()
+        {
+
+            var attributes = Attribute.GetCustomAttributes(this.GetType());
+
+            var attr = attributes.FirstOrDefault(a => a.GetType() == typeof(JapiAttribute) );
+
+            if (attr == null) return;
+
+            var japi = this.Page.Request.QueryString["_japi"];
+
+            if (string.IsNullOrEmpty(japi)) return;
+
+            var frags = japi.Split(new[] {'/'}, StringSplitOptions.None);
+
+            if (frags.Length < 2) return;
+
+            if (frags[0] == "behaviors") this.ProcessJapiForBehaviors(frags[1], frags[3]);
+        }
+        private void ProcessJapiForBehaviors(string partialBehaviorName, string partialViewModel)
+        {
+            var fireBehaviorEventMethodInfo = this.GetType().GetMethod("FireBehaviorEvent",
+                                                                    BindingFlags.Instance | BindingFlags.NonPublic |
+                                                                    BindingFlags.Public | BindingFlags.FlattenHierarchy);
+
+
+            var viewModelReference = GetViewModelReference(partialViewModel);
+
+            var viewModel = GetViewModel(GetNamespace(fireBehaviorEventMethodInfo), viewModelReference);
+
+            var requestContent = GetRequestContent(this.Page.Request);
+
+            var deserializeMethodInfo = typeof(ViewModel).GetMethod("Deserialize");
+
+            var genericMethod = deserializeMethodInfo.MakeGenericMethod(new[] { viewModel.GetType() });
+
+
+            viewModel = genericMethod.Invoke(viewModel, new object[] { requestContent });
+
+            var behaviorReference = GetBehaviorReference(partialBehaviorName);
+
+            this.InvokeFireBehaviorEventMethod(viewModel, behaviorReference, fireBehaviorEventMethodInfo);
+        }
+        private static string GetRequestContent(System.Web.HttpRequest request)
+        {
+            string documentContents;
+            using (var receiveStream = request.InputStream)
+            {
+                using (var readStream = new StreamReader(receiveStream, Encoding.UTF8))
+                {
+                    documentContents = readStream.ReadToEnd();
+                }
+            }
+            return documentContents;
+        }
+        private static string GetNamespace(MethodInfo fireBehaviorEventMethodInfo)
+        {
+            var nspace = fireBehaviorEventMethodInfo.ReflectedType.Namespace;
+            if (nspace != null) nspace = nspace.Substring(0, nspace.LastIndexOf('.'));
+            return nspace;
+        }
+
+        protected abstract Type GetViewModelReferenceType();
+        protected abstract Type GetBehaviorReferenceType();
+
+        private string GetViewModelReference(string partialViewModelName)
+        {
+            var viewModelName = string.Format("{0}ViewModel", partialViewModelName);
+            var viewModelReference = string.Empty;
+        
+            foreach (var member in GetViewModelReferenceType()
+                .GetMembers()
+                .Where(member => member.Name.ToLower() == viewModelName.ToLower()))
+            {
+                viewModelReference = member.Name;
+                break;
+            }
+            return viewModelReference;
+        }
+        private  object GetViewModel(string nspace, string viewModelReference)
+        {
+            var viewModelTypeName = string.Format("{0}.ViewModels.{1}", nspace, viewModelReference);
+
+            var appDomain = AppDomain.CurrentDomain;
+            var assemblyName = this.GetType().Assembly.FullName;
+
+            var viewModel = Activator.CreateInstance(appDomain, assemblyName, viewModelTypeName).Unwrap();
+            return viewModel;
+        }
+        private string GetBehaviorReference(string partialBehaviorReferenceName)
+        {
+            var behaviorName = string.Format("{0}Behavior", partialBehaviorReferenceName);
+            var behaviorReference = string.Empty;
+            foreach (var member in this.GetBehaviorReferenceType()
+                .GetMembers()
+                .Where(member => member.Name.ToLower() == behaviorName.ToLower()))
+            {
+                behaviorReference = member.Name;
+                break;
+            }
+            return behaviorReference;
+        }
+        private void InvokeFireBehaviorEventMethod(object viewModel, string behaviorReference,
+                                                   MethodInfo fireBehaviorEventMethodInfo)
+        {
+            var genericListType = typeof (BehaviorEvent<>).MakeGenericType(new[] {viewModel.GetType()});
+            var behaviorEvent = Activator.CreateInstance(genericListType);
+
+            var setViewModel = behaviorEvent.GetType().GetProperty("ViewModel").GetSetMethod();
+            setViewModel.Invoke(behaviorEvent, new[] {viewModel});
+
+            var setBehaviorReference = behaviorEvent.GetType().GetProperty("BehaviorReference").GetSetMethod();
+            setBehaviorReference.Invoke(behaviorEvent, new object[] {behaviorReference});
+
+            var method = fireBehaviorEventMethodInfo.MakeGenericMethod(new[] {viewModel.GetType()});
+
+            try
+            {
+                method.Invoke(this, new[] {behaviorEvent});
+
+                var getViewModel = behaviorEvent.GetType().GetProperty("ViewModel").GetGetMethod();
+
+                var postViewModel = getViewModel.Invoke(behaviorEvent, null);
+
+                var deserializeMethodInfo = typeof(ViewModel).GetMethod("Serialize", new Type[] {});
+
+
+                var json = deserializeMethodInfo.Invoke(postViewModel, null) as String;
+
+                this.Page.Response.Clear();
+                if (json != null)
+                {
+                    this.Page.Response.Write(json);
+                }
+                this.Page.Response.StatusCode =(int) HttpStatusCode.OK;
+                this.Page.Response.Flush();
+                this.Page.Response.ContentType = "application/json";
+                this.Page.Response.Close();
+            }
+            catch (Exception ex)
+            {
+                this.Page.Response.Clear();
+                this.Page.Response.Write(ex.Message);
+                this.Page.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                this.Page.Response.Flush();
+                this.Page.Response.Close();
+            }
+        }
 
         protected virtual void ScriptManagerNavigate(object sender, HistoryEventArgs e)
         {
@@ -417,10 +587,10 @@ namespace Org.Juipp.Core.Controllers
         protected void OnInitialBehaviorEventFired<T>(string behaviorName) where T : IViewModel, new()
         {
             this.OnBehaviorEventFired(null,
-                new BehaviorEvent<T>()
-                {
-                    BehaviorReference = behaviorName
-                });
+                new BehaviorEvent<T>
+                    {
+                        BehaviorReference = behaviorName
+                    });
         }
         protected void OnLoadBehaviorViewBinding()
         {
@@ -453,6 +623,11 @@ namespace Org.Juipp.Core.Controllers
             foreach (var view in Views.Where(view => this.ViewControllerBinding[view.Key] == this.ID))
             {
                 view.Value.BehaviorContext = this;
+
+                foreach (var sub in view.Value.Controls.OfType<ViewBase>())
+                {
+                    sub.BehaviorContext = this;
+                }
 
                 if (view.Value is IBehaviorEventSender<T>)
                 {

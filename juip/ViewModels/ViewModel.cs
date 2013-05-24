@@ -23,14 +23,91 @@
 
 using System;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization.Json;
+using System.Text;
+using System.Web.Script.Serialization;
+using Org.Juipp.Core.Views;
 
 namespace Org.Juipp.Core.ViewModels
 {
     [Serializable]
     public class ViewModel : IViewModel
     {
+        private static object GetControl(ViewBase view, FieldInfo field)
+        {
+            return view.GetType().InvokeMember(
+                field.Name,
+                BindingFlags.GetField | BindingFlags.NonPublic | BindingFlags.Instance,
+                Type.DefaultBinder,
+                view,
+                new object[] { });
+        }
+        private static PropertyInfo GetProperty(FieldInfo field, string name)
+        {
+            return field.FieldType.GetProperties().FirstOrDefault(m => m.Name == name);
+        }
+        private void SetProperty(FieldInfo field, object control, Type modelType, PropertyInfo property, string propertyName)
+        {
+            var propertyInfo = GetProperty(field, propertyName);
+            if (propertyInfo != null)
+            {
+                var value = propertyInfo.GetValue(control, null);
+                modelType.InvokeMember(
+                    property.Name,
+                    BindingFlags.SetProperty,
+                    Type.DefaultBinder,
+                    this, new[] { value });
+            }
+        }
+
+        public ViewModel Bind(ViewBase view)
+        {
+            var modelType = this.GetType();
+            var viewType = view.GetType();
+
+            foreach (var property in modelType.GetProperties())
+            {
+                var controlID = string.Format("_{0}_{1}", modelType.Name, property.Name);
+
+                var field = viewType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                                    .FirstOrDefault(m => m.Name.EndsWith(controlID));
+
+                if (field == null) continue;
+
+                var control = GetControl(view, field);
+
+                SetProperty(field, control, modelType, property, "SelectedValue");
+                SetProperty(field, control, modelType, property, "Text");
+                SetProperty(field, control, modelType, property, "Value");
+
+            }
+            return this;
+        }
+        public string Serialize()
+        {
+            return Serialize(this);
+        }
+        public static string Serialize<T>(T obj)
+        {
+            var serializer = new DataContractJsonSerializer(obj.GetType());
+            var ms = new MemoryStream();
+            serializer.WriteObject(ms, obj);
+            var retVal = Encoding.UTF8.GetString(ms.ToArray());
+            return retVal;
+        }
+        public static T Deserialize<T>(string json)
+        {
+            var obj = Activator.CreateInstance<T>();
+            var ms = new MemoryStream(Encoding.Unicode.GetBytes(json));
+            var serializer = new DataContractJsonSerializer(obj.GetType());
+            obj = (T)serializer.ReadObject(ms);
+            ms.Close();
+            return obj;
+        }
         public ViewModel Clone()
         {
             using (var stream = new MemoryStream())

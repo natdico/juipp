@@ -21,7 +21,6 @@
     WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Org.Juipp.Core.Commons;
 using Org.Juipp.Core.Events.Arguments;
 using Org.Juipp.Core.ViewModels;
 

@@ -21,12 +21,9 @@
     WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Org.Juipp.Core.ViewModels;
-
-namespace Org.Juipp.Core.Views
+namespace Org.Juipp.Core.Commons
 {
-    public interface ICanCollectBehaviorEventSender<T>  where T : IViewModel, new()
-    {
-        void AddBehaviorEventSender(IBehaviorEventSender<T> behaviorTrigger);
-    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class JapiAttribute : System.Attribute { }
 }

@@ -72,7 +72,7 @@ namespace Org.Juipp.Core.Views
 
         public virtual void Hide()
         {
-            if (this.Visible == true) this.Visible = false;
+            if (this.Visible) this.Visible = false;
             this.OnVisibilityChanged(false);
         }
         public virtual void Show()
@@ -86,23 +86,23 @@ namespace Org.Juipp.Core.Views
         public T RetrieveBindingElement<T>()
         {
             var name = typeof(T).FullName;
-            if (name != null)
-            {
+            //if (name != null)
+            //{
                 var bindingItem = this.ViewState[name];
                 if (bindingItem == null) return default(T);
                 return (T) bindingItem;
-            }
-            return default(T);
+            //}
+            //return default(T);
         }
         public void PersistBindingElement<T>(T element)
         {
             var name = typeof(T).FullName;
-            if (name != null)
-            {
+            //if (name != null)
+            //{
                 var bindingItem = this.ViewState[name];
                 if (bindingItem != null) this.ViewState.Remove(name);
                 this.ViewState.Add(name, element);
-            }
+            //}
         }
         
 
@@ -130,15 +130,15 @@ namespace Org.Juipp.Core.Views
         }
         public bool SendBehaviorEvent<T>(string reference, T viewModel) where T : IViewModel, new()
         {
-            return this.SendBehaviorEvent<T>(new BehaviorEvent<T>()
-                                                 {
-                                                     BehaviorReference = reference,
-                                                     ViewModel = viewModel
-                                                 });
+            return this.SendBehaviorEvent(new BehaviorEvent<T>
+                                              {
+                                                  BehaviorReference = reference,
+                                                  ViewModel = viewModel
+                                              });
         }
         public bool _<T>(BehaviorEvent<T> behaviorEvent) where T : IViewModel, new()
         {
-            return this.SendBehaviorEvent<T>(behaviorEvent);
+            return this.SendBehaviorEvent(behaviorEvent);
         }
         public bool SendBehaviorEvent<T>(BehaviorEvent<T> behaviorEvent) where T : IViewModel, new()
         {
