@@ -125,7 +125,7 @@ namespace Org.Juipp.Core.Controllers
                 this.ViewHistory = viewHistory;
             }
         }
-        private void BindingViewModel(ViewBase view, IViewModel viewModel)
+        private void BindingViewModel(ViewBase view, IViewModel viewModel) 
         {
             try
             {
@@ -424,7 +424,14 @@ namespace Org.Juipp.Core.Controllers
 
             if (string.IsNullOrEmpty(this.Page.ClientQueryString)) return;
 
-            this.ProcessJapi();
+            try
+            {
+                this.ProcessJapi();
+            }
+            catch (Exception ex)
+            {
+                this.EndResponseWithStatusCode(ex.Message, HttpStatusCode.InternalServerError);
+            }
         }
 
         private void ProcessJapi()
@@ -444,7 +451,22 @@ namespace Org.Juipp.Core.Controllers
 
             if (frags.Length < 2) return;
 
-            if (frags[0] == "behaviors") this.ProcessJapiForBehaviors(frags[1], frags[3]);
+            if (frags[0] == "behaviors" && frags[2] == "execute")
+            {
+                this.ProcessJapiForBehaviors(frags[1], frags[3]);
+                return;
+            }
+
+            this.EndResponseWithStatusCode("Invalid or undefined JAPI URL", HttpStatusCode.BadRequest);
+        }
+
+        private void EndResponseWithStatusCode(string message, HttpStatusCode code)
+        {
+            this.Page.Response.Clear();
+            this.Page.Response.Write(message);
+            this.Page.Response.StatusCode = (int)code;
+            this.Page.Response.Flush();
+            this.Page.Response.Close();
         }
         private void ProcessJapiForBehaviors(string partialBehaviorName, string partialViewModel)
         {
@@ -455,20 +477,39 @@ namespace Org.Juipp.Core.Controllers
 
             var viewModelReference = GetViewModelReference(partialViewModel);
 
-            var viewModel = GetViewModel(GetNamespace(fireBehaviorEventMethodInfo), viewModelReference);
+            var partialNamespace = GetNamespace(fireBehaviorEventMethodInfo);
+
+            var viewModel = GetViewModel(partialNamespace, viewModelReference);
 
             var requestContent = GetRequestContent(this.Page.Request);
 
             var deserializeMethodInfo = typeof(ViewModel).GetMethod("Deserialize");
 
             var genericMethod = deserializeMethodInfo.MakeGenericMethod(new[] { viewModel.GetType() });
-
+             
 
             viewModel = genericMethod.Invoke(viewModel, new object[] { requestContent });
 
             var behaviorReference = GetBehaviorReference(partialBehaviorName);
 
+            if (this.IsExposedForJapi(behaviorReference, partialNamespace) == false)
+                throw new ApplicationException(string.Format("{0} is not exposed to JAPI.", behaviorReference));
+
             this.InvokeFireBehaviorEventMethod(viewModel, behaviorReference, fireBehaviorEventMethodInfo);
+        }
+        private bool IsExposedForJapi(string behaviorReference, string nspace)
+        {
+            var behaviorTypeName = string.Format("{0}.Behaviors.{1}", nspace, behaviorReference);
+
+            var assemblyName = this.GetType().Assembly.FullName;
+
+            var behaviorType =  Activator.CreateInstance(assemblyName, behaviorTypeName).Unwrap().GetType();
+
+            var attributes = Attribute.GetCustomAttributes(behaviorType);
+
+            var attr = attributes.FirstOrDefault(a => a.GetType() == typeof(JapiAttribute) );
+
+            return attr != null;
         }
         private static string GetRequestContent(System.Web.HttpRequest request)
         {
@@ -529,6 +570,7 @@ namespace Org.Juipp.Core.Controllers
             }
             return behaviorReference;
         }
+
         private void InvokeFireBehaviorEventMethod(object viewModel, string behaviorReference,
                                                    MethodInfo fireBehaviorEventMethodInfo)
         {
@@ -543,37 +585,26 @@ namespace Org.Juipp.Core.Controllers
 
             var method = fireBehaviorEventMethodInfo.MakeGenericMethod(new[] {viewModel.GetType()});
 
-            try
+            method.Invoke(this, new[] {behaviorEvent});
+
+            var getViewModel = behaviorEvent.GetType().GetProperty("ViewModel").GetGetMethod();
+
+            var postViewModel = getViewModel.Invoke(behaviorEvent, null);
+
+            var deserializeMethodInfo = typeof (ViewModel).GetMethod("Serialize", new Type[] {});
+
+
+            var json = deserializeMethodInfo.Invoke(postViewModel, null) as String;
+
+            this.Page.Response.Clear();
+            if (json != null)
             {
-                method.Invoke(this, new[] {behaviorEvent});
-
-                var getViewModel = behaviorEvent.GetType().GetProperty("ViewModel").GetGetMethod();
-
-                var postViewModel = getViewModel.Invoke(behaviorEvent, null);
-
-                var deserializeMethodInfo = typeof(ViewModel).GetMethod("Serialize", new Type[] {});
-
-
-                var json = deserializeMethodInfo.Invoke(postViewModel, null) as String;
-
-                this.Page.Response.Clear();
-                if (json != null)
-                {
-                    this.Page.Response.Write(json);
-                }
-                this.Page.Response.StatusCode =(int) HttpStatusCode.OK;
-                this.Page.Response.Flush();
-                this.Page.Response.ContentType = "application/json";
-                this.Page.Response.Close();
+                this.Page.Response.Write(json);
             }
-            catch (Exception ex)
-            {
-                this.Page.Response.Clear();
-                this.Page.Response.Write(ex.Message);
-                this.Page.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                this.Page.Response.Flush();
-                this.Page.Response.Close();
-            }
+            this.Page.Response.ContentType = "application/json";
+            this.Page.Response.StatusCode = (int) HttpStatusCode.OK;
+            this.Page.Response.Flush();
+            this.Page.Response.Close();
         }
 
         protected virtual void ScriptManagerNavigate(object sender, HistoryEventArgs e)
