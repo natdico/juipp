@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="dabb4628-c8f9-4df1-9689-50b387a1b280" Version="1.0" Language="en-US" Publisher="Adisware LLC" />
+    <DisplayName>Juipp Visual Studio Templates</DisplayName>
+    <Description xml:space="preserve">Juicy Presentation Pattern - Visual Studio Extension for Juipp item template and catalyst files.</Description>
+    <MoreInfo>http://www.juipp.org</MoreInfo>
+    <License>MIT_LICENSE.txt</License>
+    <Icon>LOGO_ICON_juipp_icon.ico</Icon>
+    <Tags>ASP.NET;MVC;JUIPP;SharePoint</Tags>
+  </Metadata>
+  <Installation AllUsers="true">
+    <InstallationTarget Version="[11.0,12.0)" Id="Microsoft.VisualStudio.VWDExpress" />
+    <InstallationTarget Version="[11.0,12.0)" Id="Microsoft.VisualStudio.Premium" />
+    <InstallationTarget Version="[11.0,12.0)" Id="Microsoft.VisualStudio.Pro" />
+    <InstallationTarget Version="[11.0,12.0)" Id="Microsoft.VisualStudio.Ultimate" />
+  </Installation>
+  <Dependencies>
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="3.5" />
+    <Dependency Id="Microsoft.VisualStudio.MPF.11.0" DisplayName="Visual Studio MPF 11.0" d:Source="Installed" Version="11.0" />
+    <Dependency d:Source="Installed" Id="NuPackToolsVsix.Microsoft.67e54e40-0ae3-42c5-a949-fddf5739e7a5" DisplayName="NuGet Package Manager" Version="[2.1.31002.9028,3.0)" d:InstallSource="Download" Location="http://nuget.org/" />
+  </Dependencies>
+
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="File" Path="ItemTemplates" d:TargetPath="ItemTemplates\Juipp\adisware.juipp.catalyst.controller.zip" />
+    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="File" Path="ItemTemplates" d:TargetPath="ItemTemplates\Juipp\adisware.juipp.catalyst.struct.zip" />
+    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="File" Path="ItemTemplates" d:TargetPath="ItemTemplates\Juipp\adisware.juipp.catalyst.view.zip" />
+    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="File" Path="ItemTemplates" d:TargetPath="ItemTemplates\Juipp\adisware.juipp.catalyst.viewmodel.zip" />
+    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="File" Path="ItemTemplates" d:TargetPath="ItemTemplates\Juipp\adisware.juipp.catalyst.behavior.zip" />
+    <Asset Type="Microsoft.VisualStudio.Assembly" d:Source="File" Path="adisware.juipp.Wizards.dll" AssemblyName="adisware.juipp.Wizards, Version=1.0.6.0, Culture=neutral, PublicKeyToken=2410bba4a1745095" />
+  </Assets>
+</PackageManifest>

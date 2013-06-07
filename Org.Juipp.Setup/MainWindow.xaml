@@ -1,0 +1,18 @@
+﻿<mui:ModernWindow  x:Class="Org.Juipp.Setup.MainWindow"
+xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:mui="http://firstfloorsoftware.com/ModernUI" 
+  Title="MainWindow" Height="400" Width="700">
+    
+    <mui:ModernWindow.MenuLinkGroups>
+        <mui:LinkGroup DisplayName="Welcome to Juipp Installation Guide" >
+            <mui:LinkGroup.Links>
+                <mui:Link DisplayName="Prerequisites" Source="Prereq.xaml" />
+                <mui:Link DisplayName="Juipp Extensions" Source="Extensions.xaml"  />
+                <mui:Link DisplayName="Juipp" Source="Juipp.xaml"  />
+                <mui:Link DisplayName="License" Source="License.xaml"  />
+            </mui:LinkGroup.Links>
+        </mui:LinkGroup>
+    </mui:ModernWindow.MenuLinkGroups>
+    
+</mui:ModernWindow>
